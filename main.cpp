@@ -7,19 +7,7 @@
 #include <iostream>
 #include <unordered_map>
 
-#define OmarchPath "/home/pythonic/.config/omarchy/current/theme"
-#define GhosttyConfigFilePath "/home/pythonic/.config/ghostty/config"
-#define tmpFile "tmp"
-#define MAX_BUF 1024
-
-#define LOG(msg, ...)                                                    \
-    {                                                                    \
-        fprintf(logFile, "File %s | Line %d :: \n", __FILE__, __LINE__); \
-        fprintf(logFile, (msg), ##__VA_ARGS__);                          \
-        printf("\n");                                                    \
-    }
-
-#define OKAY(MSG, ...) printf("[+] " MSG "\n", ##__VA_ARGS__)
+#include "./mainHeader.h"
 
 std::unordered_map<std::string, std::string> omarchToGhostty = {
     {"catppuccin", "catppuccin-mocha"},
@@ -36,17 +24,52 @@ std::unordered_map<std::string, std::string> omarchToGhostty = {
 
 FILE *logFile = NULL;
 
-char *extract_theme() {
-    char *buf = (char *)malloc(MAX_BUF);
-
-    if (realpath(OmarchPath, buf) == NULL) {
-        LOG("error reading symbolic for omarchy");
+static inline char *getUserHome(void) {
+    char *env = getenv("HOME");
+    if (env == NULL) {
+        LOG_ERROR("could not find the HOME environment variable");
         exit(EXIT_FAILURE);
     }
 
-#ifdef DEBUG
+    return strdup(env);
+}
+
+static char *getOmarchyPath(void) {
+    char *homeDir = getUserHome();
+    char *buf = (char *)malloc(1024);
+    snprintf(buf, MAX_BUF, "%s/.config/omarchy/current/theme", homeDir);
+    free(homeDir);
+    return buf;
+}
+
+static char *getGhosttyPath(void) {
+    char *homeDir = getUserHome();
+    char *buffer = (char *)malloc(1024);
+
+    snprintf(buffer, MAX_BUF, "%s/.config/ghostty/config", homeDir);
+    free(homeDir);
+    return buffer;
+}
+
+static char *getGhosttyPathTmp(void) {
+    char *homeDir = getUserHome();
+    char *buffer = (char *)malloc(1024);
+
+    snprintf(buffer, MAX_BUF, "%s/.config/ghostty/config.tmp", homeDir);
+    free(homeDir);
+    return buffer;
+}
+
+char *extract_theme(char *omarchyPath) {
+    char *buf = (char *)malloc(MAX_BUF);
+    printf("omarch path is %s\n", omarchyPath);
+
+    if (realpath(omarchyPath, buf) == NULL) {
+        LOG_ERROR("error reading symbolic for omarchy");
+        exit(EXIT_FAILURE);
+    }
+
     OKAY("Omarch point at %s", buf);
-#endif  // DEBUG
 
     // Find the theme name
     char *tok = strtok(buf, "/");
@@ -56,35 +79,33 @@ char *extract_theme() {
         tok = strtok(NULL, "/");
     }
 
-#ifdef DEBUG
-    OKAY("Theme is %s\n", ptrtok);
-#endif  // DEBUG
+    OKAY("Theme is %s", ptrtok);
 
     char *theme = strdup(ptrtok);
     free(buf);
     return theme;
 }
 
-void modifieConfigAndSendSignal(const char *ghosttyTheme) {
-    FILE *ghosttyConfig = fopen(GhosttyConfigFilePath, "r");
+void modifieConfig(const char *ghosttyTheme, const char *ghosttyConfigPath,
+                   const char *ghosttyConfigPathTmp) {
+    FILE *ghosttyConfig = fopen(ghosttyConfigPath, "r");
 
-    if (ghosttyConfig == NULL) LOG("Error openning ghostty config file");
-    FILE *tmp = fopen(tmpFile, "w");
+    if (ghosttyConfig == NULL) LOG_ERROR("Error openning ghostty config file");
+    FILE *tmp = fopen(ghosttyConfigPathTmp, "w");
 
     if (tmp == NULL) {
-        LOG("Error creating tmp config file");
+        LOG_ERROR("Error creating tmp config file");
         exit(EXIT_FAILURE);
     }
 
-    char buf[2048] = {0};
+    char buf[MAX_BUF] = {0};
     char formatted_theme[MAX_BUF] = {0};
     snprintf(formatted_theme, MAX_BUF, "theme = \"%s\" \n", ghosttyTheme);
 
     int replaced = 0;
-    while (fgets(buf, 2048, ghosttyConfig) != NULL) {
+    while (fgets(buf, MAX_BUF, ghosttyConfig) != NULL) {
         if (strstr(buf, "theme =") != NULL && !replaced) {
             fputs(formatted_theme, tmp);
-            LOG("Found the replaced the theme to %s", ghosttyTheme);
             replaced = 1;
         } else {
             fputs(buf, tmp);
@@ -93,53 +114,68 @@ void modifieConfigAndSendSignal(const char *ghosttyTheme) {
 
     if (!replaced) {
         fputs(formatted_theme, tmp);
-#ifdef DEBUG
         OKAY("Theme not found using default theme tokyonight_night");
-#endif  // DEBUG
     } else {
-#ifdef DEBUG
         OKAY("Config file updated successfully");
-#endif  // DEBUG
     }
 
-    // Check for read errors
     if (ferror(ghosttyConfig)) {
-        LOG("Error reading ghostty config file");
+        LOG_ERROR("Error reading ghostty config file");
         fclose(ghosttyConfig);
         fclose(tmp);
-        remove(tmpFile);  // Clean up temp file
+        remove(ghosttyConfigPathTmp);  // Clean up temp file
         exit(EXIT_FAILURE);
     }
 
     fclose(ghosttyConfig);
     fclose(tmp);
 
-    if (rename(tmpFile, GhosttyConfigFilePath) != 0) {
-        remove(tmpFile);
-        LOG("Error replacing original file");
+    if (rename(ghosttyConfigPathTmp, ghosttyConfigPath) != 0) {
+        perror("rename");
+        remove(ghosttyConfigPathTmp);
+        LOG_ERROR("Error replacing original file");
     }
-    LOG("Theme has been changed");
+    OKAY("Theme has been changed");
 }
 
 int main(int argc, char *argv[]) {
-    logFile = fopen("log.txt", "a");
+    char *omarchyPath = getOmarchyPath();
+    char *ghosttyPath = getGhosttyPath();
+    char *ghosttyPathTmp = getGhosttyPathTmp();
+
+    logFile = fopen(logPath, "a");
 
     if (!logFile) {
         perror("fopen");
         return EXIT_FAILURE;
     }
+
     // Should free theme
-    char *theme = extract_theme();
+    char *theme = extract_theme(omarchyPath);
     std::string ghostty = omarchToGhostty[std::string(theme)];
     if (ghostty.length() == 0) {
-        LOG("theme not found...");
+        LOG_ERROR("theme not found...");
+        free(theme);
+        free(ghosttyPath);
+        free(omarchyPath);
+        free(ghosttyPathTmp);
         exit(EXIT_FAILURE);
     }
 
-#ifdef DEBUG
     OKAY("ghostty theme should be %s for this omarch theme %s", ghostty.c_str(), theme);
-#endif  // DEBUG
 
-    modifieConfigAndSendSignal(ghostty.c_str());
+    // appliy the theme.
+    modifieConfig(ghostty.c_str(), ghosttyPath, ghosttyPathTmp);
+
+    // Clean up and free everything..
+    free(theme);
+    free(ghosttyPath);
+    free(omarchyPath);
+    free(ghosttyPathTmp);
+
+    OKAY("Exit SUCCESS");
+    fclose(logFile);
+
+    // Exitting...
     return EXIT_SUCCESS;
 }
