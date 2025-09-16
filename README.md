@@ -7,6 +7,11 @@ such it does not allow import theming not singal to update the config or reload 
 So i decided to make a simpe program that will work every time you change theme the program shall be added into the 
 `~/.local/share/omarchy/bin/omarchy-theme-set` after the theme is applied.
 
+The program going to go to the default places for ghostty config and omarchy theme. it going to scan 
+your ghostty config file to find `theme =` if found it going to change it to what ever omarchy theme is
+if not it gonna default to `tokyonight_night` theme. This issue gonna be resolved so that it update 
+accordingly with the new theme and not to fallback.
+
 
 ## Usage and compiling.
 ### clone the repo.
