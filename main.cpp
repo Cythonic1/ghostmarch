@@ -9,18 +9,17 @@
 
 #include "./mainHeader.h"
 
-std::unordered_map<std::string, std::string> omarchToGhostty = {
-    {"catppuccin", "catppuccin-mocha"},
-    {"catppuccin-latte", "catppuccin-latte"},
-    {"everforest", "Everforest Dark - Hard"},
-    {"gruvbox", "GruvboxDarkHard"},
-    {"kanagawa", "Kanagawa Dragon"},
-    {"matte-black", "tokyonight_night"},
-    {"nord", "nord"},
-    {"osaka-jade", "Everforest Dark - Hard"},
-    {"ristretto", "tokyonight_night"},
-    {"rose-pine", "rose-pine-dawn"},
-    {"tokyo-night", "tokyonight_night"}};
+std::unordered_map<std::string, std::string> omarchToGhostty = {{"catppuccin", "Catppuccin Mocha"},
+                                                                {"catppuccin-latte", "Catppuccin Latte"},
+                                                                {"everforest", "Everforest Dark - Hard"},
+                                                                {"gruvbox", "Gruvbox Dark Hard"},
+                                                                {"kanagawa", "Kanagawa Dragon"},
+                                                                {"matte-black", "tokyonight_night"},
+                                                                {"nord", "Nord"},
+                                                                {"osaka-jade", "Everforest Dark  Hard"},
+                                                                {"ristretto", "TokyoNight"},
+                                                                {"rose-pine", "Rose Pine Dawn"},
+                                                                {"tokyo-night", "TokyoNight"}};
 
 FILE *logFile = NULL;
 
@@ -86,8 +85,7 @@ char *extract_theme(char *omarchyPath) {
     return theme;
 }
 
-void modifieConfig(const char *ghosttyTheme, const char *ghosttyConfigPath,
-                   const char *ghosttyConfigPathTmp) {
+void modifieConfig(const char *ghosttyTheme, const char *ghosttyConfigPath, const char *ghosttyConfigPathTmp) {
     FILE *ghosttyConfig = fopen(ghosttyConfigPath, "r");
 
     if (ghosttyConfig == NULL) LOG_ERROR("Error openning ghostty config file");
@@ -136,6 +134,9 @@ void modifieConfig(const char *ghosttyTheme, const char *ghosttyConfigPath,
         LOG_ERROR("Error replacing original file");
     }
     OKAY("Theme has been changed");
+
+    // temp
+    system("killall ghostty -SIGUSR2");
 }
 
 int main(int argc, char *argv[]) {
